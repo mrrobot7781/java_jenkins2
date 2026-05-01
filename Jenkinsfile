@@ -2,46 +2,48 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = "java-hello-world"
-        CONTAINER_NAME = "hello-world-instance"
+        // Replace 'your-dockerhub-username' with your actual username
+        DOCKER_USER = 'mrrobot7781'
+        IMAGE_NAME  = "java-hello-world"
+        REGISTRY_ID = "my-docker-hub-credentials-id" 
     }
 
     stages {
-        stage('Checkout') {
+        stage('Checkout & Compile') {
             steps {
                 checkout scm
-            }
-        }
-
-        stage('Compile') {
-            steps {
                 sh 'javac HelloWorld.java'
             }
         }
 
-        stage('Docker Build') {
+        stage('Docker Build & Tag') {
             steps {
-                echo 'Building Docker Image...'
-                sh "docker build -t ${IMAGE_NAME} ."
+                echo 'Building and Tagging Image...'
+                // Build with the 'latest' tag and the build number for versioning
+                sh "docker build -t ${DOCKER_USER}/${IMAGE_NAME}:latest ."
+                sh "docker tag ${DOCKER_USER}/${IMAGE_NAME}:latest ${DOCKER_USER}/${IMAGE_NAME}:${BUILD_NUMBER}"
             }
         }
 
-        stage('Docker Run & Verify') {
+        stage('Docker Push') {
             steps {
-                echo 'Running Container...'
-                // Remove existing container if it exists to avoid naming conflicts
-                sh "docker rm -f ${CONTAINER_NAME} || true"
-                
-                // Run the container and capture the output
-                sh "docker run --name ${CONTAINER_NAME} ${IMAGE_NAME}"
+                // This block securely logs you into DockerHub
+                withCredentials([usernamePassword(credentialsId: REGISTRY_ID, passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER_ENV')]) {
+                    sh "echo \$DOCKER_PASS | docker login -u \$DOCKER_USER_ENV --password-stdin"
+                    
+                    echo 'Pushing Image to DockerHub...'
+                    sh "docker push ${DOCKER_USER}/${IMAGE_NAME}:latest"
+                    sh "docker push ${DOCKER_USER}/${IMAGE_NAME}:${BUILD_NUMBER}"
+                    
+                    sh "docker logout"
+                }
             }
         }
     }
 
     post {
-        always {
-            echo 'Cleaning up container...'
-            sh "docker rm -f ${CONTAINER_NAME} || true"
+        success {
+            echo "Successfully pushed ${DOCKER_USER}/${IMAGE_NAME}:${BUILD_NUMBER} to DockerHub"
         }
     }
 }
