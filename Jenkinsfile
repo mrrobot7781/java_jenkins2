@@ -1,73 +1,42 @@
 pipeline {
-
     agent any
 
-
     environment {
-
         DOCKER_USER = 'mrrobot7781'
-
         IMAGE_NAME  = "java-hello-world"
-
         REGISTRY_ID = "my-docker-hub-credentials-id"
-
-        K8S_CONFIG  = "k8s-config" // ID of the Secret File credential
-
     }
-
 
     stages {
+        // ... Stages for Compile, Build, and Push to DockerHub go here ...
 
-        // ... Previous stages: Compile, Build, and Push remain here ...
-
-
-        stage('Deploy to K8s') {
-
+        stage('Deploy to Minikube') {
             steps {
-
-                // Securely use the kubeconfig file
-
-                configFileProvider([configFile(fileId: "${K8S_CONFIG}", variable: 'KUBECONFIG')]) {
-
-                    sh "kubectl --kubeconfig=${KUBECONFIG} apply -f deployment.yaml"
-
-                    
-
-                    echo 'Waiting for deployment to complete...'
-
-                    sh "kubectl --kubeconfig=${KUBECONFIG} rollout status deployment/java-hello-world"
-
-                }
-
+                echo 'Deploying to Minikube...'
+                // Using the local kubeconfig directly 
+                sh "kubectl apply -f deployment.yaml"
+                
+                echo 'Waiting for Pod to be Ready...'
+                sh "kubectl rollout status deployment/java-hello-world"
             }
-
         }
 
-
-        stage('Verify K8s Pod') {
-
+        stage('Verify & Logs') {
             steps {
-
-                configFileProvider([configFile(fileId: "${K8S_CONFIG}", variable: 'KUBECONFIG')]) {
-
-                    echo 'Checking Pod status...'
-
-                    sh "kubectl --kubeconfig=${KUBECONFIG} get pods -l app=hello-world"
-
+                script {
+                    // Get the name of the pod created
+                    def podName = sh(script: "kubectl get pods -l app=hello-world -o jsonpath='{.items[0].metadata.name}'", returnStdout: true).trim()
                     
-
-                    echo 'Fetching Application Logs...'
-
-                    // This grabs the logs from the pod to prove the "Hello World" ran inside K8s
-
-                    sh "kubectl --kubeconfig=${KUBECONFIG} logs -l app=hello-world"
-
+                    echo "Checking logs for Pod: ${podName}"
+                    sh "kubectl logs ${podName}"
                 }
-
             }
-
         }
-
     }
 
+    post {
+        success {
+            echo "Deployment successful. Run 'minikube service java-hello-service' to access locally."
+        }
+    }
 }

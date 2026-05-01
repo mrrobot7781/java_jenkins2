@@ -2,8 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: java-hello-world
-  labels:
-    app: hello-world
 spec:
   replicas: 1
   selector:
@@ -16,7 +14,7 @@ spec:
     spec:
       containers:
       - name: java-app
-        # Replace 'your-username' with your DockerHub username
+        # Replace with your DockerHub username
         image: mrrobot7781/java-hello-world:latest
         imagePullPolicy: Always
 ---
@@ -31,4 +29,4 @@ spec:
     - protocol: TCP
       port: 80
       targetPort: 8080
-  type: ClusterIP
+  type: NodePort # Changed to NodePort for easier access in Minikube
